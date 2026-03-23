@@ -45,6 +45,28 @@ User -> Nginx (port 80) -> Express API (port 3000) -> Redis (port 6379)
 - `backend/server.js` - Express API with Redis connection (note how it connects to Redis using environment variables)
 - `nginx/nginx.conf` - Nginx configuration that proxies API requests
 
+## Understanding the Nginx Config
+
+The `nginx/nginx.conf` file is provided for you. Here's what it does and why:
+
+```nginx
+location / {
+    root   /usr/share/nginx/html;    # Serve static files from this directory
+    try_files $uri $uri/ /index.html; # If file not found, serve index.html
+}
+
+location /api/ {
+    proxy_pass http://backend:3000;   # Forward /api/* requests to the Express service
+}
+```
+
+**Key concepts:**
+- Nginx handles two jobs: serving static files (HTML/CSS/JS) and proxying API requests to the backend
+- `backend:3000` works because Docker Compose provides DNS resolution between services - Nginx can find the `backend` service by name
+- We keep the rest of Nginx's defaults - in production, you typically only customize the parts you need and trust the sensible defaults for everything else
+
+You don't need to modify this file - it's ready to use. Your job is to wire it into Docker Compose correctly.
+
 ## Your Mission
 
 **Create a `docker-compose.yml`** and a **backend `Dockerfile`** that wire all three services together.
@@ -62,7 +84,7 @@ When you're done:
 - Which service should expose a port to the host? (Hint: only one needs to)
 - How does Nginx know where to find the backend? (Check `nginx/nginx.conf`)
 - How does the backend know where to find Redis? (Check `backend/server.js` for environment variables)
-- **Looking ahead**: This separation of networks mirrors real production architectures. In the cloud, your database should never be directly accessible from the internet - only your backend should reach it.
+- **Looking ahead**: This separation of networks mirrors real production architectures. In the cloud, only the reverse proxy (Nginx) should be internet-facing. Both your backend and database are internal services - the backend handles business logic and shouldn't be exposed to users directly, and the database should only be reachable from the backend.
 
 ## Hints
 
@@ -180,7 +202,7 @@ docker compose up -d
 
 - **Three-tier architecture** (frontend/backend/database) is the standard pattern for web applications
 - **Nginx as a reverse proxy** serves static files directly and forwards API requests to the backend - this is how most production apps are deployed
-- **Network isolation** is a security best practice: your database should only be reachable from the backend, never from the frontend or the internet
+- **Network isolation** is a security best practice: only the reverse proxy is internet-facing, the backend and database are internal services that communicate through private networks
 - **Docker Compose** makes this complex setup trivial - defining three services, two networks, and a volume in a single YAML file
 - The `depends_on` directive ensures services start in the right order
 
@@ -195,9 +217,10 @@ git checkout solution
 ## Bonus Challenges
 
 1. **Check the logs**: Run `docker compose logs backend` - can you see the API requests flowing through?
-2. **Scale the backend**: Try `docker compose up --scale backend=2`. What happens? Does Nginx automatically load-balance?
-3. **Add environment variables**: Make the Redis host configurable via `docker-compose.yml` environment variables
+2. **Multi-stage Dockerfile**: Rewrite the backend Dockerfile using multi-stage builds - use a `builder` stage for `npm install` and a clean `production` stage that only copies what's needed. Compare image sizes.
+3. **Scale the backend**: Try `docker compose up --scale backend=2`. What happens? Does Nginx automatically load-balance?
 4. **Add healthchecks**: Add a `healthcheck` for each service in the compose file
+5. **Add environment variables**: Make the Redis host and port configurable via environment variables in `docker-compose.yml`
 
 ---
 
