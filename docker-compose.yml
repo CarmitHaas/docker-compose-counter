@@ -1,0 +1,40 @@
+services:
+  # Frontend: Nginx serves static files and proxies API requests
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend:/usr/share/nginx/html
+    depends_on:
+      - backend
+    networks:
+      - frontend-network
+
+  # Backend: Express.js API handles business logic
+  backend:
+    build: ./backend
+    environment:
+      - REDIS_HOST=db
+      - REDIS_PORT=6379
+    depends_on:
+      - db
+    networks:
+      - frontend-network
+      - backend-network
+
+  # Database: Redis stores the counter value
+  db:
+    image: redis:alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend-network
+
+networks:
+  frontend-network:
+  backend-network:
+
+volumes:
+  redis_data:
